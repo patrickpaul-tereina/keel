@@ -106,8 +106,10 @@ func (s *PubsubSubscriber) ensureSubscription(ctx context.Context, subscriptionI
 	}
 
 	_, err = s.client.CreateSubscription(ctx, subscriptionID, pubsub.SubscriptionConfig{
-		Topic:       s.client.Topic(topicID),
-		AckDeadline: 10 * time.Second,
+		Topic: s.client.Topic(topicID),
+		// AckDeadline must comfortably exceed the deliberate delay applied in
+		// callback before the message is acked, otherwise pubsub will redeliver.
+		AckDeadline: 30 * time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create subscription %s, error: %s", subscriptionID, err)
@@ -192,6 +194,11 @@ func (s *PubsubSubscriber) callback(ctx context.Context, msg *pubsub.Message) {
 		},
 		CreatedAt: time.Now(),
 	}
+
+	// Deliberate delay before notifying providers, giving the new GCR image
+	// time to settle before triggering an update. Note: this holds the message
+	// until ack, so AckDeadline (set in ensureSubscription) must exceed this.
+	time.Sleep(15 * time.Second)
 
 	s.providers.Submit(event)
 }
