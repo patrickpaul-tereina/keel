@@ -91,13 +91,15 @@ func (s *sender) Send(event types.EventNotification) error {
 	params.Username = s.botName
 	params.IconURL = constants.KeelLogoURL
 
+	message := formatMessage(event.Message)
+
 	attachements := []slack.Attachment{
 		{
 			Fallback: event.Message,
 			Color:    event.Level.Color(),
 			Fields: []slack.AttachmentField{
 				{
-					Value: event.Message,
+					Value: message,
 					Short: false,
 				},
 			},
@@ -125,4 +127,33 @@ func (s *sender) Send(event types.EventNotification) error {
 		}
 	}
 	return nil
+}
+
+// formatMessage reformats a successful deployment update notification into a
+// short, readable summary. The source message has the fixed shape:
+//
+//	Successfully updated <kind> <namespace>/<name> <current>-><new> (<images>)
+//
+// so the relevant pieces are pulled out by field position. Messages that don't
+// match this shape are returned unchanged.
+func formatMessage(message string) string {
+	if !strings.HasPrefix(message, "Successfully updated ") {
+		return message
+	}
+
+	fields := strings.Fields(message)
+	if len(fields) < 5 {
+		return message
+	}
+
+	// fields[3] = namespace/name, fields[4] = current->new
+	nameParts := strings.Split(fields[3], "/")
+	name := nameParts[len(nameParts)-1]
+
+	versions := strings.SplitN(fields[4], "->", 2)
+	if len(versions) != 2 {
+		return message
+	}
+
+	return fmt.Sprintf("%s Deployed\nExisting Version: %s\nNew Version: %s", name, versions[0], versions[1])
 }
