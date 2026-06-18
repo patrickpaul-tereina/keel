@@ -97,7 +97,7 @@ func (s *sender) Send(event types.EventNotification) error {
 			Color:    event.Level.Color(),
 			Fields: []slack.AttachmentField{
 				{
-					Title: event.Type.String(),
+					Title: strings.ToUpper(event.Type.String()),
 					Value: event.Message,
 					Short: false,
 				},
